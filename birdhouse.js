@@ -215,7 +215,50 @@ function BirdHouse(params) {
 			}
 		}
 
-		webView.addEventListener('beforeload',function(){
+		function stringBeginsWith(url, prefix){
+		    if (url.substr(0, prefix.length) == prefix) {
+		    	return true;
+		    }
+		    return false;
+		}
+
+		// If callback_url is specified when creating the BH instance, it can
+		// be intercepted before the webview loads it.
+		// This tells us the auth step is done.
+		// For example:
+		//	var BH = new BirdHouse({ ...
+		//    callback_url: "myfineapp://callback"
+		//	});
+		// When this fires the beforeload, we're done.
+		webView.addEventListener('beforeload',function(e){
+			if (cfg.callback_url !="" && stringBeginsWith(e.url, cfg.callback_url)) {
+				Ti.API.debug("beforeload intercepted " + e.url);
+			
+				// Twitter has redirected the page to our custom callback URL
+				doinOurThing = true; // kill the timeout b/c we are doin our thing
+
+				// success!
+				params = "";
+				var parts = (e.url).replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m,key,value) {
+					params = params + m;
+
+					if (key=='oauth_verifier') {
+						cfg.request_verifier = value;
+					}
+				});
+
+				if (cfg.request_verifier!="") {
+					webView.hide();
+					webView.stopLoading(true);
+					win.remove(webView);
+					win.close();
+
+					get_access_token(callback);
+
+					return; // we are done here
+				}
+			}
+
 			loading = true;
 		});
 		webView.addEventListener('load',function(e){
